@@ -17,9 +17,8 @@ def Bi_LSTM(hidden_dim,layer_num,bilstm_input):
     return Bi_LSTM[0]
 
 def LSTM_decode(hidden_dim,layer_num,lstmd_input):
-    lstm_cell=tf.nn.rnn_cell.BasicLSTMCell(hidden_dim, forget_bias=0.0, state_is_tuple=True)
-    return tf.contrib.rnn.MultiRNNCell([lstm_cell] * layer_num, state_is_tuple=True)
-
+    LSTM_decode=tf.nn.rnn_cell.BasicLSTMCell(hidden_dim, forget_bias=0.0, state_is_tuple=True)
+    return tf.nn.dynamic_rnn(LSTM_decode,lstmd_input)
 
 
 
