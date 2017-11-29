@@ -3,13 +3,25 @@ __author__ = 'Suncong Zheng'
 import cPickle
 import os.path
 import numpy as np
+import tensorflow as tf
 from PrecessEEdata import get_data_e2e
 from Evaluate import evaluavtion_triple
-from keras.models import Sequential
-from keras.layers.embeddings import Embedding
-from keras.layers.recurrent import LSTM
-from keras.layers.core import  TimeDistributedDense, Dropout, Activation,Merge
-from decodelayer import ReverseLayer2,LSTMDecoder_tag
+
+def embedding_layer(batchsize,embedding_weights,input_x,Dropout):
+    return tf.nn.dropout(tf.nn.embedding_lookup(embedding_weights,input_x),keep_prob=1-Dropout)
+
+def Bi_LSTM(hidden_dim,layer_num,bilstm_input):
+    forward_lstm=tf.nn.rnn_cell.BasicLSTMCell(hidden_dim, forget_bias=0.0, state_is_tuple=True)
+    backward_lstm=tf.nn.rnn_cell.BasicLSTMCell(hidden_dim, forget_bias=0.0, state_is_tuple=True)
+    Bi_LSTM=tf.nn.static_bidirectional_rnn(f_LSTM,b_LSTM,bilstm_input,dtype=tf.float32)
+    return Bi_LSTM[0]
+
+def LSTM_decode(hidden_dim,layer_num,lstmd_input):
+    lstm_cell=tf.nn.rnn_cell.BasicLSTMCell(hidden_dim, forget_bias=0.0, state_is_tuple=True)
+    return tf.contrib.rnn.MultiRNNCell([lstm_cell] * layer_num, state_is_tuple=True)
+
+
+
 
 def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
                           batchsize, vocabsize, target_idex_word,lossnum,shuffle=False):
@@ -138,15 +150,6 @@ def test_model(nn_model,testdata,index2word,resultfile=''):
 
 def train_e2e_model(eelstmfile, modelfile,resultdir,npochos,
                     lossnum=1,batch_size = 50,retrain=False):
-    """
-    sourcevocabsize：embedding词典中词语的个数
-    targetvocabsize：分类器输出的类别个数，也就是关系的种类数
-    source_W：输入的embedding矩阵
-    input_seq_lenth：输入的句子的最大长度（也就是最长句子的单词个数）
-    output_seq_lenth：第二层lstm的输出的最大sequence长度
-    hidden_dim：论文里h的维度
-    emd_dim：单词embedding的维度
-    """
 
     # load training data and test data
     traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k \
