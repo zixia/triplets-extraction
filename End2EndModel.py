@@ -3,6 +3,7 @@ __author__ = 'Suncong Zheng'
 import cPickle
 import os.path
 import numpy as np
+import pdb
 from PrecessEEdata import get_data_e2e
 from Evaluate import evaluavtion_triple
 from keras.models import Sequential
@@ -13,17 +14,22 @@ from decodelayer import ReverseLayer2,LSTMDecoder_tag
 
 def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
                           batchsize, vocabsize, target_idex_word,lossnum,shuffle=False):
+    """
+    target_idex_word：每个数字对应的关系
+    """
+
     assert len(inputsX) == len(inputsY)
     indices = np.arange(len(inputsX))
     if shuffle:
         np.random.shuffle(indices)
     for start_idx in range(0, len(inputsX) - batchsize + 1, batchsize):
-        excerpt = indices[start_idx:start_idx + batchsize]
+        excerpt = indices[start_idx:start_idx + batchsize]  #从训练集里随机抽出batch个数据
         x = np.zeros((batchsize, max_s)).astype('int32')
         y = np.zeros((batchsize, max_t, vocabsize + 1)).astype('int32')
-        for idx, s in enumerate(excerpt):
+        # pdb.set_trace()
+        for idx, s in enumerate(excerpt): #idx：0-49 s各句子的序号
             x[idx,] = inputsX[s]
-            for idx2, word in enumerate(inputsY[s]):
+            for idx2, word in enumerate(inputsY[s]): #word 句子里的每个词的tag的编号，id=0不存在，id=1Other
                 targetvec = np.zeros(vocabsize + 1)
                 wordstr=''
                 if word!=0:
@@ -110,7 +116,7 @@ def test_model(nn_model,testdata,index2word,resultfile=''):
         xbatch = testx[n*batch_size:(n+1)*batch_size]
         ybatch = testy[n*batch_size:(n+1)*batch_size]
         predictions = nn_model.predict(xbatch)
-
+        pdb.set_trace()
         for si in range(0,len(predictions)):
             if testlinecount < testlen:
                 sent = predictions[si]
@@ -146,16 +152,26 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,npochos,
     output_seq_lenth：第二层lstm的输出的最大sequence长度
     hidden_dim：论文里h的维度
     emd_dim：单词embedding的维度
+    x_train[23****][50]：每句话里各个词的id
+    y_train[23****][50]：每句话里各个词所属的tag的id
+    source_vob[174648]：每个词对应的id
+    source_idex_word[174648]：每个id对应的词（没有0）
+    target_vob[162]：每个tag对应的id
+    target_idex_word：每个id对应的tag
     """
 
     # load training data and test data
     traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k \
         = cPickle.load(open(eelstmfile, 'rb'))
 
+
     # train model
     x_train = np.asarray(traindata[0], dtype="int32")
     y_train = np.asarray(traindata[1], dtype="int32")
-
+    for x, y in get_training_batch_xy_bias(x_train, y_train, max_s, max_s,
+                                          batch_size, len(target_vob),
+                                            target_idex_word,lossnum,shuffle=True):
+        pass
     nn_model = creat_binary_tag_LSTM(sourcevocabsize=len(source_vob), targetvocabsize=len(target_vob),
                                     source_W=source_W, input_seq_lenth=max_s, output_seq_lenth=max_s,
                                     hidden_dim=k, emd_dim=k)
