@@ -1,5 +1,5 @@
 # -*- encoding:utf-8 -*-
-__author__ = 'Suncong Zheng'
+__author__ = 'Han Wang'
 import cPickle
 import os.path
 import pdb
@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 from PrecessEEdata import get_data_e2e
 from Evaluate import evaluavtion_triple
+from LSTM_decoder import decoder_layer
 
 def weight_variable(shape):
     init=tf.truncated_normal(shape,stddev=0.1,dtype=tf.float32)
@@ -22,14 +23,16 @@ def embedding_layer(embedding_weights,input_x,keep_prob):
 def Bi_LSTM(hidden_dim,bilstm_input,batchsize):
     n_steps=bilstm_input.shape[1]
     bilstm_input = tf.unstack(bilstm_input, n_steps, 1)
-    forward_lstm=tf.contrib.rnn.LSTMCell(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01),forget_bias=0.0, state_is_tuple=True)
-    backward_lstm=tf.contrib.rnn.LSTMCell(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0, state_is_tuple=True)
+    with tf.variable_scope('forward'):
+        forward_lstm=tf.contrib.rnn.LSTMCell(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01),forget_bias=0.0, state_is_tuple=True)
+    with tf.variable_scope('backward'):
+        backward_lstm=tf.contrib.rnn.LSTMCell(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0, state_is_tuple=True)
     Bi_LSTM=tf.nn.static_bidirectional_rnn(forward_lstm,backward_lstm,bilstm_input,dtype=tf.float32)
     return tf.stack(Bi_LSTM[0],axis=1)
 
 def LSTMd_layer(hidden_dim,lstmd_input,batchsize):
-    LSTMd=tf.contrib.rnn.LSTMCell(hidden_dim*2,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0, state_is_tuple=True)
-    # LSTM_decode.zero_state(batchsize,tf.float32)
+    with tf.variable_scope('decode'):
+        LSTMd=decoder_layer(hidden_dim*2,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0)
     return tf.nn.dynamic_rnn(LSTMd,lstmd_input,dtype=tf.float32)
 
 def softmax_layer(layer_weights,softmax_input,layer_bias):
