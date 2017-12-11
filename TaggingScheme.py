@@ -136,7 +136,7 @@ def tag_sent(source_json,tag_json,isTrain=True):
     train_json_file = open(tag_json, 'w', 0)
     file = open(source_json, 'r')
     sentences_0 = file.readlines()
-    sentences=[]
+    sentences=[] #file里的所有句子（无重复）
     for s in sentences_0:
         if not sentences.__contains__(s):
             sentences.append(s)
@@ -161,9 +161,9 @@ def tag_sent(source_json,tag_json,isTrain=True):
             emStartIndexes = set()
             emIndexByText = {}
             for em in sent['entityMentions']:
-                emText = unicodedata.normalize('NFKD', em['text']).encode('ascii','ignore')
+                emText = unicodedata.normalize('NFKD', em['text']).encode('ascii','ignore') #每个实体
                 if emText not in emIndexByText:
-                    start, end = find_index(tokens, emText.split())
+                    start, end = find_index(tokens, emText.split()) 
                 else:
                     offset = emIndexByText[emText][-1][1]
                     start, end = find_index(tokens[offset:], emText.split())

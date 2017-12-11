@@ -6,9 +6,9 @@ def evaluavtion_triple(testresult):
     total_predict=0.
     total_right = 0.
 
-    for sent in testresult:
-        ptag = sent[0]
-        ttag = sent[1]
+    for sent in testresult: #每句话
+        ptag = sent[0]  #每句话预测的标签
+        ttag = sent[1]  #每句话真实的标签
         predictrightnum, predictnum ,rightnum = count_sentence_triple_num(ptag,ttag)
         total_predict_right+=predictrightnum
         total_predict+=predictnum
@@ -22,8 +22,8 @@ def evaluavtion_triple(testresult):
 
 def count_sentence_triple_num(ptag,ttag):
     #transfer the predicted tag sequence to triple index
-    predict_rmpair= tag_to_triple_index(ptag)
-    right_rmpair = tag_to_triple_index(ttag)
+    predict_rmpair= tag_to_triple_index(ptag) #模型预测的实体关系对
+    right_rmpair = tag_to_triple_index(ttag) #正确的实体关系对
     predict_right_num = 0       # the right number of predicted triple
     predict_num = 0     # the number of predicted triples
     right_num = 0
@@ -53,14 +53,14 @@ def count_sentence_triple_num(ptag,ttag):
 def tag_to_triple_index(ptag):
     rmpair={}
     for i in range(0,len(ptag)):
-        tag = ptag[i]
+        tag = ptag[i] #每个词的标签
         if not tag.__eq__("O") and not tag.__eq__(""):
-            type_e = tag.split("__")
+            type_e = tag.split("__") #标签包含的实体
             if not rmpair.__contains__(type_e[0]):
                 eelist=[]
                 e1=[]
                 e2=[]
-                if type_e[1].__contains__("1"):
+                if type_e[1].__contains__("1"): #这个词的标签包含1
                     if type_e[1].__contains__("S"):
                         e1.append((i,i+1))
                     elif type_e[1].__contains__("B"):
@@ -71,7 +71,7 @@ def tag_to_triple_index(ptag):
                                 j+=1
                             else:
                                 break
-                        e1.append((i, j))
+                        e1.append((i, j)) #实体1在句子中的位置
                 elif type_e[1].__contains__("2"):
                     if type_e[1].__contains__("S"):
                         e2.append((i,i+1))
@@ -83,7 +83,7 @@ def tag_to_triple_index(ptag):
                                 j+=1
                             else:
                                 break
-                        e2.append((i, j))
+                        e2.append((i, j)) #实体2在句子中的位置
                 eelist.append(e1)
                 eelist.append(e2)
                 rmpair[type_e[0]] = eelist

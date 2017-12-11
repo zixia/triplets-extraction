@@ -116,7 +116,6 @@ def test_model(nn_model,testdata,index2word,resultfile=''):
         xbatch = testx[n*batch_size:(n+1)*batch_size]
         ybatch = testy[n*batch_size:(n+1)*batch_size]
         predictions = nn_model.predict(xbatch)
-        pdb.set_trace()
         for si in range(0,len(predictions)):
             if testlinecount < testlen:
                 sent = predictions[si]

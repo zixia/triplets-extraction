@@ -11,9 +11,10 @@ from tensorflow.python.ops.rnn_cell_impl import _Linear
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import array_ops
 
-LSTMStateTuple=collections.namedtuple('LSTMStateTuple',('t','c','h'))
+LSTMStateList=collections.namedtuple('LSTMStateList',('t','c','h'))
+LSTMStateTuple=collections.namedtuple('LSTMStateTuple',('c','h'))
 
-class decoder_layer(LSTMCell):
+class decoderLSTM(LSTMCell):
 	def __init__(self, num_units,
 		use_peepholes=False, cell_clip=None,
 		initializer=None, num_proj=None, proj_clip=None,
@@ -66,7 +67,7 @@ class decoder_layer(LSTMCell):
 		self._forget_bias = forget_bias
 		self._activation = activation or math_ops.tanh
 
-		self._state_size=LSTMStateTuple(num_units,num_units,num_units)
+		self._state_size=LSTMStateList(num_units,num_units,num_units)
 		self._output_size = num_units
 		self._linear1 = None
 		self._linear2 = None
@@ -108,15 +109,50 @@ class decoder_layer(LSTMCell):
 		with tf.variable_scope('t',initializer=self._initializer):
 			self._linear3=_Linear([new_h], self._num_units, True) #t
 			t=self._linear3([new_h])
-		return new_h,LSTMStateTuple(t,new_c,new_h)
+		return new_h,LSTMStateList(t,new_c,new_h)
 
-def _like_rnncell(cell):
-	"""Checks that a given object is an RNNCell by using duck typing."""
-	conditions = [hasattr(cell, "output_size"), hasattr(cell, "state_size"),
-	            hasattr(cell, "zero_state"), callable(cell)]
-	return all(conditions)
+class encoderLSTM(LSTMCell):
+	def __init__(self, num_units,
+		use_peepholes=False, cell_clip=None,
+		initializer=None, num_proj=None, proj_clip=None,
+		forget_bias=1.0,
+		activation=None, reuse=None):
+		super(LSTMCell, self).__init__(_reuse=reuse)
 
-cell=decoder_layer(100)
-b=LSTMCell(100)
-print hasattr(cell, "output_size"),hasattr(cell, "state_size"),hasattr(cell, "zero_state"),callable(cell)
-print hasattr(cell,'_scope'),hasattr(b,'_scope')
+		self._num_units = num_units
+		self._use_peepholes = use_peepholes
+		self._cell_clip = cell_clip
+		self._initializer = initializer
+		self._num_proj = num_proj
+		self._proj_clip = proj_clip
+		self._forget_bias = forget_bias
+		self._activation = activation or math_ops.tanh
+
+		self._state_size=LSTMStateTuple(num_units,num_units)
+		self._output_size = num_units
+		self._linear1 = None
+		self._linear2 = None
+		self._linear3=None
+
+	@property
+	def state_size(self):
+		return self._state_size
+
+	def call(self,inputs,state):
+		sigmoid = math_ops.sigmoid
+		tanh=math_ops.tanh
+		# Parameters of gates are concatenated into one multiply for efficiency.
+		(c, h) = state
+		with tf.variable_scope('if',initializer=self._initializer):
+			self._linear1=_Linear([inputs, h, c], 2*self._num_units, True) #i,f
+			i,f=array_ops.split(
+	    		value=self._linear1([inputs, h, c]), num_or_size_splits=2, axis=1)
+		with tf.variable_scope('z',initializer=self._initializer):
+			self._linear2=_Linear([inputs,h],self._num_units,True) #z
+			z=self._linear2([inputs,h])
+		new_c=sigmoid(f)*c+sigmoid(i)*tanh(z)
+		with tf.variable_scope('o',initializer=self._initializer):
+			self._linear2=_Linear([inputs, h, new_c], self._num_units, True) #o
+			o=self._linear2([inputs, h, new_c])
+		new_h=sigmoid(o)*tanh(new_c)
+		return new_h,LSTMStateTuple(new_c,new_h)

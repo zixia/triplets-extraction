@@ -7,32 +7,30 @@ import numpy as np
 import tensorflow as tf
 from PrecessEEdata import get_data_e2e
 from Evaluate import evaluavtion_triple
-from LSTM_decoder import decoder_layer
+from LSTM_layer import encoderLSTM,decoderLSTM
 
-def weight_variable(shape):
+def weight_variable(shape,name):
     init=tf.truncated_normal(shape,stddev=0.1,dtype=tf.float32)
-    return tf.Variable(init)
+    return tf.Variable(init,name=name)
 
-def bias_variable(shape):
+def bias_variable(shape,name):
     init=tf.constant(0.1,shape=shape,dtype=tf.float32)
-    return tf.Variable(init)
+    return tf.Variable(init,name=name)
 
 def embedding_layer(embedding_weights,input_x,keep_prob):
-    return tf.nn.dropout(tf.nn.embedding_lookup(tf.Variable(embedding_weights),input_x),keep_prob=keep_prob)
+    with tf.device('/cpu:0'):
+        return tf.nn.dropout(tf.nn.embedding_lookup(tf.Variable(embedding_weights,name='embedding_matrix'),input_x),keep_prob=keep_prob)
 
 def Bi_LSTM(hidden_dim,bilstm_input,batchsize):
     n_steps=bilstm_input.shape[1]
     bilstm_input = tf.unstack(bilstm_input, n_steps, 1)
-    with tf.variable_scope('forward'):
-        forward_lstm=tf.contrib.rnn.LSTMCell(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01),forget_bias=0.0, state_is_tuple=True)
-    with tf.variable_scope('backward'):
-        backward_lstm=tf.contrib.rnn.LSTMCell(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0, state_is_tuple=True)
+    forward_lstm=encoderLSTM(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01),forget_bias=0.0)
+    backward_lstm=encoderLSTM(hidden_dim,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0)
     Bi_LSTM=tf.nn.static_bidirectional_rnn(forward_lstm,backward_lstm,bilstm_input,dtype=tf.float32)
     return tf.stack(Bi_LSTM[0],axis=1)
 
 def LSTMd_layer(hidden_dim,lstmd_input,batchsize):
-    with tf.variable_scope('decode'):
-        LSTMd=decoder_layer(hidden_dim*2,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0)
+    LSTMd=decoderLSTM(hidden_dim*2,initializer=tf.random_uniform_initializer(-0.01, 0.01), forget_bias=0.0)
     return tf.nn.dynamic_rnn(LSTMd,lstmd_input,dtype=tf.float32)
 
 def softmax_layer(layer_weights,softmax_input,layer_bias):
@@ -43,7 +41,7 @@ def softmax_layer(layer_weights,softmax_input,layer_bias):
     #    temp=tf.matmul(_,layer_weights)+layer_bias
     #    res.append(tf.nn.softmax(logits=temp))
     #return tf.stack(res)
-    return tf.matmul(softmax_input,layer_weights)
+    return tf.matmul(softmax_input,layer_weights)+layer_bias
 
 def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
                           batchsize, vocabsize, target_idex_word,lossnum,shuffle=False):
@@ -94,25 +92,27 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,npochos,
 #    if retrain:
 #        nn_model.load_weights(modelfile)
     #nn_model = CreatBinaryTagLSTM_Att(len(source_vob), len(target_vob), source_W, max_s, max_t, k, k)
-    epoch = 0
     x=tf.placeholder(tf.int32,[None,max_s])
     y_label=tf.placeholder(tf.float32,[None,max_s,len(target_vob)+1])
+    global_step=tf.Variable(0)
+    learning_rate = tf.train.exponential_decay(0.001, global_step, npochos*100, 0.5, staircase=True)
     keep_prob=tf.placeholder(tf.float32)
     source_W=tf.to_float(source_W, name='ToFloat')
     word_embedding=embedding_layer(embedding_weights=source_W,input_x=x,keep_prob=keep_prob)
     bilstm_h=Bi_LSTM(hidden_dim=k,bilstm_input=word_embedding,batchsize=batchsize)
     lstmd_h=LSTMd_layer(hidden_dim=k,lstmd_input=bilstm_h,batchsize=batchsize)[0]
-    softmax_W,softmax_b=weight_variable([k*2,len(target_vob)+1]),bias_variable([len(target_vob)+1])
+    softmax_W,softmax_b=weight_variable([k*2,len(target_vob)+1],'softmax_matrix'),bias_variable([len(target_vob)+1],'sofmax_bias')
     softmax_output=softmax_layer(softmax_W,lstmd_h,softmax_b)
     y_pre=tf.nn.softmax(logits=softmax_output)
     loss = tf.reduce_mean(-tf.reduce_sum(tf.reshape(y_label,[-1,y_label.shape[-1]])*tf.log(y_pre),reduction_indices=[1]))
-    train_step=tf.train.RMSPropOptimizer(0.001).minimize(loss)
+    train_step=tf.train.RMSPropOptimizer(learning_rate).minimize(loss,global_step=global_step)
     with tf.Session() as sess:
         # summary_writer = tf.summary.FileWriter('./graph', sess.graph)
         sess.run(tf.global_variables_initializer())
-        while (epoch < npochos):
+        for epoch in range(npochos):
             print 'epoch:'+str(epoch)
-            epoch+=1
+            # for _ in tf.trainable_variables():
+            #    print _
             for x_data, y_data in get_training_batch_xy_bias(x_train, y_train, max_s, max_s,
                                               batchsize, len(target_vob),
                                                 target_idex_word,lossnum,shuffle=True):
@@ -143,8 +143,6 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,npochos,
                 ybatch = testy[n*batch_size:(n+1)*batch_size]
                 predictions=y_pre.eval(feed_dict={x:xbatch,keep_prob:1.0})
                 predictions=predictions.reshape([batch_size,predictions.shape[0]/batch_size,predictions.shape[-1]])
-                if epoch>5:
-                    pdb.set_trace()
                 for si in range(0,len(predictions)):
                     if testlinecount < testlen:
                         sent = predictions[si]
