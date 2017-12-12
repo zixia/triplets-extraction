@@ -21,7 +21,7 @@ def aaa(left,right,num,relation,temp):
 	return temp
 
 def deal(file):
-	for sentence,raw_relation,entity1_b,entity1_e,entity2_b,entity2_e in zip(file['sentences'],file['raw_relations'],file['entity1_b'],file['entity1_e'],file['entity2_b'],file['entity2_e']):
+	for sentence,relations,raw_relation,entity1_b,entity1_e,entity2_b,entity2_e in zip(file['sentences'],file['relations'],file['raw_relations'],file['entity1_b'],file['entity1_e'],file['entity2_b'],file['entity2_e']):
 		temp={}
 		sentence=re.sub('(\<e1\>|\</e1\>|\<e2\>|\</e2\>)','',sentence)
 		text=sentence.split()
@@ -29,7 +29,7 @@ def deal(file):
 		temp['tokens']=text
 		temp['tags']=['O']*len(text)
 		relation=re.sub('\(.*\)','',raw_relation)
-		if 'Other' not in raw_relation:
+		if 'ther' not in raw_relation:
 			if raw_relation.find('1')<raw_relation.find('2'):
 				temp=aaa(entity1_b,entity1_e,1,relation,temp)
 				temp=aaa(entity2_b,entity2_e,2,relation,temp)

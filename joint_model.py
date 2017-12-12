@@ -10,6 +10,7 @@ import tensorflow as tf
 from PrecessEEdata import get_data_e2e
 from Evaluate import evaluavtion_triple
 from LSTM_layer import encoderLSTM,decoderLSTM
+from tensorflow.contrib.rnn import LSTMCell
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -97,8 +98,6 @@ class JointModel(object):
 
 def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
                           batchsize, vocabsize, target_idex_word,lossnum,shuffle=False):
-    with open('./data/prf.log','a') as f:
-        f.write('\n')
     assert len(inputsX) == len(inputsY)
     indices = np.arange(len(inputsX))
     if shuffle:
@@ -123,7 +122,7 @@ def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
         yield x, y
 
 
-def test_model(nn_model,testdata,index2word,session,arg,flag='test on testdata'):
+def test_model(nn_model,testdata,index2word,session,arg,epoch,flag='test on testdata'):
     print flag
     index2word[0]=''
     testx = np.asarray(testdata[0],dtype="int32")
@@ -168,7 +167,7 @@ def test_model(nn_model,testdata,index2word,session,arg,flag='test on testdata')
                 testlinecount += 1
                 testresult.append(result)
     # cPickle.dump(testresult,open(resultfile,'wb'))
-    P, R, F = evaluavtion_triple(testresult)
+    P, R, F = evaluavtion_triple(testresult,epoch)
     print P, R, F
     with open('./data/prf{}.log'.format(arg),'a') as f:
         f.write(flag+'\n')
@@ -176,7 +175,7 @@ def test_model(nn_model,testdata,index2word,session,arg,flag='test on testdata')
     # return P, R, F
 
 def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
-                    lossnum=10,batchsize = 500,retrain=False):
+                    lossnum=10,batchsize = 512,retrain=False):
     
     # load training data and test data
     traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k \
@@ -184,6 +183,7 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
 
     # train model
     x_train = np.asarray(traindata[0], dtype="int32")
+    x_train = np.fliplr(x_train)
     y_train = np.asarray(traindata[1], dtype="int32")
 
     with tf.Session() as sess:
@@ -202,10 +202,15 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
                                                 target_idex_word,lossnum,shuffle=True):
                 # pdb.set_trace()
                 m.train_step.run(feed_dict={m.inputs:x_data,m.y_label:y_data})
-                print 'loss: {}'.format(m.loss.eval(feed_dict={m.inputs:x_data,m.y_label:y_data}))
-            tempdata=[traindata[0][:100],traindata[1][:100]]
-            test_model(m_test,tempdata,target_idex_word,sess,arg,'test on traindata')
-            test_model(m_test,testdata,target_idex_word,sess,arg)
+                value=m.loss.eval(feed_dict={m.inputs:x_data,m.y_label:y_data})
+                print 'loss: {}'.format(value)
+                if value>10:
+                    with open('nan.log','a') as f:
+                        f.write(str(value)+'\n')
+            rand=np.random.randint(low=0,high=20000)
+            tempdata=[traindata[0][rand:rand+2000],traindata[1][rand:rand+2000]]
+            test_model(m_test,tempdata,target_idex_word,sess,arg,epoch,'test on traindata')
+            test_model(m_test,testdata,target_idex_word,sess,arg,epoch)
 
 def infer_e2e_model(eelstmfile, lstm_modelfile,resultfile):
     traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, \
@@ -242,7 +247,7 @@ if __name__=="__main__":
         print "Precess lstm data...."
         get_data_e2e(trainfile,testfile,w2v_file,e2edatafile,maxlen=maxlen)
     train_e2e_model(e2edatafile, modelfile,resultdir,arg,
-                     npochos=100,lossnum=alpha,retrain=False)
+                     npochos=1000,lossnum=alpha,retrain=False)
 
 
 

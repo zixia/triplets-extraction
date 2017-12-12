@@ -34,14 +34,14 @@ def make_idx_data_index_EE_LSTM(file,max_s,source_vob,target_vob):
     fr = f.readlines()
     for line in fr:
         sent = json.loads(line.strip('\r\n'))
-        s_sent = sent['tokens']
-        t_sent = sent['tags']
+        s_sent = sent['tokens'] #每句话各个词
+        t_sent = sent['tags'] #每句话各个词的tag
         data_t = []
         data_s = []
         if len(s_sent) > max_s:
             i=max_s-1
             while i >= 0:
-                data_s.append(source_vob[s_sent[i]])
+                data_s.append(source_vob[s_sent[i]]) 
                 i-=1
         else:
             num=max_s-len(s_sent)

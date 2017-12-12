@@ -1,7 +1,8 @@
 import numpy as np
 import cPickle
+import pdb
 
-def evaluavtion_triple(testresult):
+def evaluavtion_triple(testresult,epoch):
     total_predict_right=0.
     total_predict=0.
     total_right = 0.
@@ -9,7 +10,9 @@ def evaluavtion_triple(testresult):
     for sent in testresult: #每句话
         ptag = sent[0]  #每句话预测的标签
         ttag = sent[1]  #每句话真实的标签
-        predictrightnum, predictnum ,rightnum = count_sentence_triple_num(ptag,ttag)
+        if epoch>100:
+            pdb.set_trace()
+        predictrightnum, predictnum ,rightnum = count_sentence_triple_num(ptag,ttag,epoch)
         total_predict_right+=predictrightnum
         total_predict+=predictnum
         total_right += rightnum
@@ -20,10 +23,12 @@ def evaluavtion_triple(testresult):
 
     return P,R,F
 
-def count_sentence_triple_num(ptag,ttag):
+def count_sentence_triple_num(ptag,ttag,epoch):
     #transfer the predicted tag sequence to triple index
-    predict_rmpair= tag_to_triple_index(ptag) #模型预测的实体关系对
-    right_rmpair = tag_to_triple_index(ttag) #正确的实体关系对
+    if epoch>100
+        pdb.set_trace()
+    predict_rmpair= tag_to_triple_index(ptag,epoch) #模型预测的实体关系对
+    right_rmpair = tag_to_triple_index(ttag,epoch) #正确的实体关系对
     predict_right_num = 0       # the right number of predicted triple
     predict_num = 0     # the number of predicted triples
     right_num = 0
@@ -50,7 +55,9 @@ def count_sentence_triple_num(ptag,ttag):
         right_num += min(len(e1),len(e2))
     return predict_right_num,predict_num,right_num
 
-def tag_to_triple_index(ptag):
+def tag_to_triple_index(ptag,epoch):
+    if epoch>100:
+        pdb.set_trace()
     rmpair={}
     for i in range(0,len(ptag)):
         tag = ptag[i] #每个词的标签

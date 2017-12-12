@@ -88,8 +88,8 @@ class Preprocess(object):
         self.data['entity2_e'] = e22
         if(self.train_or_test=="train"):
             pdb.set_trace()
-            self.data[0:4500].to_csv('train.csv',index=False)
-            self.data[4500:].to_csv("test.csv",index=False)
+            self.data[:-2500].to_csv('train.csv',index=False)
+            self.data[-2500:].to_csv("test.csv",index=False)
 
 if __name__=='__main__':
     prep = Preprocess("train")
