@@ -51,6 +51,7 @@ def make_idx_data_index_EE_LSTM(file,max_s,source_vob,target_vob):
             while i >= 0:
                 data_s.append(source_vob[s_sent[i]])
                 i-=1
+        data_s.reverse() #diy
         data_s_all.append(data_s)
         if len(t_sent) > max_s:
             for i in range(0,max_s):
@@ -139,7 +140,7 @@ def get_word_index(train,test):
         count+=1
     return source_vob,sourc_idex_word,target_vob,target_idex_word,max_s
 
-def get_data_e2e(trainfile,testfile,w2v_file,eelstmfile,maxlen = 50):
+def get_data_e2e(trainfile,testfile,showfile,w2v_file,eelstmfile,maxlen = 50):
     """
     Converts the input files  into the end2end model input formats
     :param the train tag file: produced by TaggingScheme.py
@@ -170,9 +171,10 @@ def get_data_e2e(trainfile,testfile,w2v_file,eelstmfile,maxlen = 50):
     #将词语序列转换成id序列
     train = make_idx_data_index_EE_LSTM(trainfile,max_s,source_vob,target_vob)
     test = make_idx_data_index_EE_LSTM(testfile, max_s, source_vob, target_vob)
+    show = make_idx_data_index_EE_LSTM(showfile, max_s, source_vob, target_vob)
 
     print "dataset created!"
-    cPickle.dump([train,test,source_W,source_vob,sourc_idex_word,
+    cPickle.dump([train,test,show,source_W,source_vob,sourc_idex_word,
                   target_vob,target_idex_word,max_s,k],open(eelstmfile,'wb'))
 
 def zero_digits(s):

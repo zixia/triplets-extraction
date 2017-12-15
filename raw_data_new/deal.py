@@ -48,6 +48,7 @@ length=len(Valid)+len(Invalid)
 flag=34000/length
 train_list=Valid[:int(len(Valid)*flag)]+Invalid[:int(len(Invalid)*flag)]
 test_list=Valid[int(len(Valid)*flag):]+Invalid[int(len(Invalid)*flag):]
+show_list=Valid[int(len(Valid)*flag):]
 random.shuffle(train_list)
 random.shuffle(test_list)
 with open('train_tag.json','a') as f:
@@ -55,4 +56,7 @@ with open('train_tag.json','a') as f:
 		f.write(json.dumps(_,ensure_ascii=False)+'\n')
 with open('test_tag.json','a') as f:
 	for _ in test_list:
+		f.write(json.dumps(_,ensure_ascii=False)+'\n')
+with open('show_tag.json','a') as f:
+	for _ in show_list:
 		f.write(json.dumps(_,ensure_ascii=False)+'\n')

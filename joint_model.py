@@ -4,6 +4,7 @@ import os
 import sys
 import cPickle
 import os.path
+import json
 import pdb
 import numpy as np
 import tensorflow as tf
@@ -13,6 +14,8 @@ from LSTM_layer import encoderLSTM,decoderLSTM
 from tensorflow.contrib.rnn import LSTMCell
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+reload(sys)
+sys.setdefaultencoding( "utf-8" )
 
 def data_type():
     return tf.float32
@@ -121,10 +124,10 @@ def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
                 y[idx, idx2,] = targetvec
         yield x, y
 
-
-def test_model(nn_model,testdata,index2word,session,arg,epoch,flag='test on testdata'):
+"""
+def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='test on testdata'):
     print flag
-    index2word[0]=''
+    index2tag[0]=''
     testx = np.asarray(testdata[0],dtype="int32")
     testy = np.asarray(testdata[1],dtype="int32")
 
@@ -154,12 +157,12 @@ def test_model(nn_model,testdata,index2word,session,arg,epoch,flag='test on test
                 for word in sent:
                     next_index = np.argmax(word)
                     if next_index != 0:
-                        next_token = index2word[next_index]
+                        next_token = index2tag[next_index]
                         ptag.append(next_token)
                 senty = ybatch[si]
                 ttag=[] #实际的标签
                 for word in senty:
-                    next_token = index2word[word]
+                    next_token = index2tag[word]
                     ttag.append(next_token)
                 result = [] #result[0]=ptag result[1]=ttag
                 result.append(ptag)
@@ -172,18 +175,85 @@ def test_model(nn_model,testdata,index2word,session,arg,epoch,flag='test on test
     with open('./data/prf{}.log'.format(arg),'a') as f:
         f.write(flag+'\n')
         f.write(str(P)+' '+str(R)+' '+str(F)+'\n')
-    # return P, R, F
+    return P, R, F
+"""
+
+def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='test on testdata'):
+    print flag
+    index2tag[0]=''
+    xbatch = np.asarray(testdata[0],dtype="int32")
+    ybatch = np.asarray(testdata[1],dtype="int32")
+    testresult=[]
+    batch_size=xbatch.shape[0]
+    predictions=nn_model.predictions.eval(feed_dict={nn_model.inputs:xbatch},session=session)
+    predictions=predictions.reshape([batch_size,predictions.shape[0]/batch_size,predictions.shape[-1]])
+    for si in range(0,len(predictions)):
+        sent = predictions[si]
+        ptag = [] #预测的标签
+        for word in sent:
+            next_index = np.argmax(word)
+            if next_index != 0:
+                next_token = index2tag[next_index]
+                ptag.append(next_token)
+        senty = ybatch[si]
+        ttag=[] #实际的标签
+        for word in senty:
+            next_token = index2tag[word]
+            ttag.append(next_token)
+        result = [] #result[0]=ptag result[1]=ttag
+        result.append(ptag)
+        result.append(ttag)
+        result.append(xbatch[si])
+        testresult.append(result)
+    # cPickle.dump(testresult,open(resultfile,'wb'))
+    P, R, F, P1, R1, F1 = evaluavtion_triple(testresult,index2tag,index2word,epoch)
+    print P, R, F, P1, R1, F1
+    with open('./data/prf{}.log'.format(arg),'a') as f:
+        f.write(flag+'\n')
+        f.write(str(P)+' '+str(R)+' '+str(F)+'\n')
+    return P, R, F, P1, R1, F1
+
+def show_result(nn_model,testdata,index2tag,index2word,session):
+    print 'show the test'
+    index2tag[0]=''
+    xbatch = np.asarray(testdata[0],dtype="int32")
+    ybatch = np.asarray(testdata[1],dtype="int32")
+    batch_size=xbatch.shape[0]
+    predictions=nn_model.predictions.eval(feed_dict={nn_model.inputs:xbatch},session=session)
+    predictions=predictions.reshape([batch_size,predictions.shape[0]/batch_size,predictions.shape[-1]])
+    for si in range(0,len(predictions)): #每句话
+        sent = predictions[si]
+        sentence=[]
+        ptag = [] #预测的标签
+        for i in range(len(sent)):
+            tag=sent[i]
+            next_index = np.argmax(tag)
+            if next_index != 0:
+                next_token = index2tag[next_index]
+                sentence.append(index2word[xbatch[si][i]])
+                ptag.append(next_token)
+        senty = ybatch[si]
+        ttag=[] #实际的标签
+        for word in senty:
+            next_token = index2tag[word]
+            ttag.append(next_token)
+        res={}
+        res['sentence']=sentence
+        res['predictions']=ptag
+        res['ground_truth']=ttag
+        with open('result.json','a') as f:
+            f.write(json.dumps(res,ensure_ascii=False)+'\n')
 
 def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
                     lossnum=10,batchsize = 512,retrain=False):
     
     # load training data and test data
-    traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k \
+    traindata, testdata, showdata , source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k \
         = cPickle.load(open(eelstmfile, 'rb'))
 
     # train model
     x_train = np.asarray(traindata[0], dtype="int32")
-    x_train = np.fliplr(x_train)
+    # x_train = np.fliplr(x_train)
     y_train = np.asarray(traindata[1], dtype="int32")
 
     with tf.Session() as sess:
@@ -207,10 +277,12 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
                 if value>10:
                     with open('nan.log','a') as f:
                         f.write(str(value)+'\n')
-            rand=np.random.randint(low=0,high=20000)
-            tempdata=[traindata[0][rand:rand+2000],traindata[1][rand:rand+2000]]
-            test_model(m_test,tempdata,target_idex_word,sess,arg,epoch,'test on traindata')
-            test_model(m_test,testdata,target_idex_word,sess,arg,epoch)
+            #rand=np.random.randint(low=0,high=20000)
+            #tempdata=[traindata[0][rand:rand+2000],traindata[1][rand:rand+2000]]
+            #test_model(m_test,tempdata,target_idex_word,sess,arg,epoch,'test on traindata')
+            P, R, F, P1, R1, F1 = test_model(m_test,testdata,target_idex_word,sourc_idex_word,sess,arg,epoch)
+            if F>0.5:
+                show_result(m_test,showdata,target_idex_word,sourc_idex_word,sess)
 
 def infer_e2e_model(eelstmfile, lstm_modelfile,resultfile):
     traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, \
@@ -236,6 +308,7 @@ if __name__=="__main__":
         arg=sys.argv[1]
     trainfile = "./data/demo/{}train_tag.json".format(arg+'/')
     testfile = "./data/demo/{}test_tag.json".format(arg+'/')
+    showfile = "./data/demo/{}show_tag.json".format(arg+'/')
     w2v_file = "./data/demo/{}w2v.pkl".format(arg+'/')
     e2edatafile = "./data/demo/{}model/e2edata.pkl".format(arg+'/')
     modelfile = "./data/demo/{}model/e2e_lstmb_model.pkl".format(arg+'/')
@@ -245,7 +318,7 @@ if __name__=="__main__":
     valid = False
     if not os.path.exists(e2edatafile):
         print "Precess lstm data...."
-        get_data_e2e(trainfile,testfile,w2v_file,e2edatafile,maxlen=maxlen)
+        get_data_e2e(trainfile,testfile,showfile,w2v_file,e2edatafile,maxlen=maxlen)
     train_e2e_model(e2edatafile, modelfile,resultdir,arg,
                      npochos=1000,lossnum=alpha,retrain=False)
 
