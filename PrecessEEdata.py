@@ -1,7 +1,7 @@
 #coding=utf-8
 __author__ = 'Suncong Zheng'
 import numpy as np
-import cPickle
+import pickle
 import json
 import re
 
@@ -10,7 +10,7 @@ def load_vec_pkl(fname,vocab,k=300):
     Loads 300x1 word vecs from word2vec
     """
     W = np.zeros(shape=(vocab.__len__() + 1, k))
-    w2v = cPickle.load(open(fname,'rb'))
+    w2v = pickle.load(open(fname,'rb'), encoding='latin1')
     w2v["UNK"] = np.random.uniform(-0.25, 0.25, k)
     for word in vocab:
         if not w2v.__contains__(word):
@@ -153,28 +153,28 @@ def get_data_e2e(trainfile,testfile,showfile,w2v_file,eelstmfile,maxlen = 50):
     source_vob, sourc_idex_word, target_vob, target_idex_word, max_s = \
     get_word_index(trainfile, testfile)
 
-    print "source vocab size: " + str(len(source_vob))
-    print "target vocab size: " + str(len(target_vob))
+    print("source vocab size: " + str(len(source_vob)))
+    print("target vocab size: " + str(len(target_vob)))
 
     #得到embedding矩阵
     source_w2v ,k ,source_W= load_vec_pkl(w2v_file,source_vob)
 
-    print "word2vec loaded!"
-    print "num words in source word2vec: " + str(len(source_w2v))+\
-          "source  unknown words: "+str(len(source_vob)-len(source_w2v))
+    print("word2vec loaded!")
+    print("num words in source word2vec: " + str(len(source_w2v))+\
+          "source  unknown words: "+str(len(source_vob)-len(source_w2v)))
 
     if max_s > maxlen:
         max_s = maxlen
 
-    print 'max soure sent lenth is ' + str(max_s)
+    print('max soure sent lenth is ' + str(max_s))
 
     #将词语序列转换成id序列
     train = make_idx_data_index_EE_LSTM(trainfile,max_s,source_vob,target_vob)
     test = make_idx_data_index_EE_LSTM(testfile, max_s, source_vob, target_vob)
     show = make_idx_data_index_EE_LSTM(showfile, max_s, source_vob, target_vob)
 
-    print "dataset created!"
-    cPickle.dump([train,test,show,source_W,source_vob,sourc_idex_word,
+    print("dataset created!")
+    pickle.dump([train,test,show,source_W,source_vob,sourc_idex_word,
                   target_vob,target_idex_word,max_s,k],open(eelstmfile,'wb'))
 
 def zero_digits(s):

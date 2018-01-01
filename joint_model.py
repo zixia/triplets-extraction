@@ -2,7 +2,7 @@
 __author__ = 'Han Wang'
 import os
 import sys
-import cPickle
+import pickle
 import os.path
 import json
 import pdb
@@ -10,12 +10,12 @@ import numpy as np
 import tensorflow as tf
 from PrecessEEdata import get_data_e2e
 from Evaluate import evaluavtion_triple
-from LSTM_layer import encoderLSTM,decoderLSTM
+from LSTM_layer import encoderLSTM, decoderLSTM
 from tensorflow.contrib.rnn import LSTMCell
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-reload(sys)
-sys.setdefaultencoding( "utf-8" )
+# reload(sys)
+# sys.setdefaultencoding( "utf-8" )
 
 def data_type():
     return tf.float32
@@ -126,7 +126,7 @@ def get_training_batch_xy_bias(inputsX, inputsY, max_s, max_t,
 
 """
 def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='test on testdata'):
-    print flag
+    print(flag)
     index2tag[0]=''
     testx = np.asarray(testdata[0],dtype="int32")
     testy = np.asarray(testdata[1],dtype="int32")
@@ -169,9 +169,9 @@ def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='te
                 result.append(ttag)
                 testlinecount += 1
                 testresult.append(result)
-    # cPickle.dump(testresult,open(resultfile,'wb'))
+    # pickle.dump(testresult,open(resultfile,'wb'))
     P, R, F = evaluavtion_triple(testresult,epoch)
-    print P, R, F
+    print(P, R, F)
     with open('./data/prf{}.log'.format(arg),'a') as f:
         f.write(flag+'\n')
         f.write(str(P)+' '+str(R)+' '+str(F)+'\n')
@@ -179,14 +179,18 @@ def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='te
 """
 
 def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='test on testdata'):
-    print flag
+    print(flag)
     index2tag[0]=''
     xbatch = np.asarray(testdata[0],dtype="int32")
     ybatch = np.asarray(testdata[1],dtype="int32")
     testresult=[]
     batch_size=xbatch.shape[0]
     predictions=nn_model.predictions.eval(feed_dict={nn_model.inputs:xbatch},session=session)
-    predictions=predictions.reshape([batch_size,predictions.shape[0]/batch_size,predictions.shape[-1]])
+    predictions=predictions.reshape([
+        batch_size,
+        int(predictions.shape[0]/batch_size),
+        predictions.shape[-1],
+    ])
     for si in range(0,len(predictions)):
         sent = predictions[si]
         ptag = [] #预测的标签
@@ -205,16 +209,16 @@ def test_model(nn_model,testdata,index2tag,index2word,session,arg,epoch,flag='te
         result.append(ttag)
         result.append(xbatch[si])
         testresult.append(result)
-    # cPickle.dump(testresult,open(resultfile,'wb'))
+    # pickle.dump(testresult,open(resultfile,'wb'))
     P, R, F, P1, R1, F1 = evaluavtion_triple(testresult,index2tag,index2word,epoch)
-    print P, R, F, P1, R1, F1
+    print(P, R, F, P1, R1, F1)
     with open('./data/prf{}.log'.format(arg),'a') as f:
         f.write(flag+'\n')
         f.write(str(P)+' '+str(R)+' '+str(F)+'\n')
     return P, R, F, P1, R1, F1
 
 def show_result(nn_model,testdata,index2tag,index2word,session):
-    print 'show the test'
+    print('show the test')
     index2tag[0]=''
     xbatch = np.asarray(testdata[0],dtype="int32")
     ybatch = np.asarray(testdata[1],dtype="int32")
@@ -248,8 +252,9 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
                     lossnum=10,batchsize = 512,retrain=False):
     
     # load training data and test data
-    traindata, testdata, showdata , source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k \
-        = cPickle.load(open(eelstmfile, 'rb'))
+    traindata, testdata, showdata , source_W, source_vob, sourc_idex_word, target_vob, target_idex_word, max_s, k,\
+        = pickle.load(open(eelstmfile, 'rb'))
+    # import pdb; pdb.set_trace()
 
     # train model
     x_train = np.asarray(traindata[0], dtype="int32")
@@ -264,16 +269,16 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
             m_test=JointModel(is_training=False,seq_length=max_s,target2id=target_vob,id2target=target_idex_word,embedding_matrix=source_W,keep_prob=1.0,bilstm_dim=k)
         sess.run(tf.global_variables_initializer())
         for epoch in range(npochos):
-            print 'epoch:'+str(epoch)
+            print('epoch:'+str(epoch))
             # for _ in tf.trainable_variables():
-            #    print _
+            #    print(_)
             for x_data, y_data in get_training_batch_xy_bias(x_train, y_train, max_s, max_s,
                                               batchsize, len(target_vob),
                                                 target_idex_word,lossnum,shuffle=True):
                 # pdb.set_trace()
                 m.train_step.run(feed_dict={m.inputs:x_data,m.y_label:y_data})
                 value=m.loss.eval(feed_dict={m.inputs:x_data,m.y_label:y_data})
-                print 'loss: {}'.format(value)
+                print('loss: {}'.format(value))
                 if value>10:
                     with open('nan.log','a') as f:
                         f.write(str(value)+'\n')
@@ -287,7 +292,7 @@ def train_e2e_model(eelstmfile, modelfile,resultdir,arg,npochos,
 def infer_e2e_model(eelstmfile, lstm_modelfile,resultfile):
     traindata, testdata, source_W, source_vob, sourc_idex_word, target_vob, \
     target_idex_word, max_s, k \
-        = cPickle.load(open(eelstmfile, 'rb'))
+        = pickle.load(open(eelstmfile, 'rb'))
 
     nnmodel = creat_binary_tag_LSTM(sourcevocabsize=len(source_vob),targetvocabsize= len(target_vob),
                                     source_W=source_W,input_seq_lenth= max_s,output_seq_lenth= max_s,
@@ -296,7 +301,7 @@ def infer_e2e_model(eelstmfile, lstm_modelfile,resultfile):
     nnmodel.load_weights(lstm_modelfile)
     P, R, F, pre1, rre1, fe1, pre2, rre2, fe2, tp1f, tp2f \
         = test_model(nnmodel, testdata, target_idex_word, resultfile)
-    print P, R, F
+    print(P, R, F)
 
 
 if __name__=="__main__":
@@ -317,7 +322,7 @@ if __name__=="__main__":
     retrain = True
     valid = False
     if not os.path.exists(e2edatafile):
-        print "Precess lstm data...."
+        print("Precess lstm data....")
         get_data_e2e(trainfile,testfile,showfile,w2v_file,e2edatafile,maxlen=maxlen)
     train_e2e_model(e2edatafile, modelfile,resultdir,arg,
                      npochos=1000,lossnum=alpha,retrain=False)

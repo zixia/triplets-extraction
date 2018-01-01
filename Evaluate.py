@@ -1,12 +1,12 @@
 # -*- encoding:utf-8 -*-
 # -*- coding:utf-8 -*-
 import numpy as np
-import cPickle
+import pickle
 import pdb
 import json
 import sys
-reload(sys)
-sys.setdefaultencoding( "utf-8" )
+# reload(sys)
+# sys.setdefaultencoding( "utf-8" )
 
 def evaluavtion_triple(testresult,index2tag,index2word,epoch):
     total_predict_right=0.
@@ -179,6 +179,6 @@ def tag_to_triple_index(ptag,epoch):
 
 if __name__=="__main__":
     resultname = "./data/demo/result/biose-loss5-result-15"
-    testresult = cPickle.load(open(resultname, 'rb'))
+    testresult = pickle.load(open(resultname, 'rb'))
     P,R,F = evaluavtion_triple(testresult)
-    print P,R,F
+    print(P,R,F)
